@@ -1,0 +1,67 @@
+diff --git a/libstdc++-v3/src/filesystem/ops.cc b/libstdc++-v3/src/filesystem/ops.cc
+index 328332a8a829..4a9e265d1d64 100644
+--- a/libstdc++-v3/src/filesystem/ops.cc
++++ b/libstdc++-v3/src/filesystem/ops.cc
+@@ -1132,10 +1132,11 @@ fs::space(const path& p, error_code& ec) noexcept
+       ec.assign(errno, std::generic_category());
+   else
+     {
++      uintmax_t fragment_size = f.f_frsize;
+       info = space_info{
+-	f.f_blocks * f.f_frsize,
+-	f.f_bfree * f.f_frsize,
+-	f.f_bavail * f.f_frsize
++	f.f_blocks * fragment_size,
++	f.f_bfree * fragment_size,
++	f.f_bavail * fragment_size
+       };
+       ec.clear();
+     }
+diff --git a/libstdc++-v3/src/filesystem/std-ops.cc b/libstdc++-v3/src/filesystem/std-ops.cc
+index 930b186e88ca..74868cd48e6d 100644
+--- a/libstdc++-v3/src/filesystem/std-ops.cc
++++ b/libstdc++-v3/src/filesystem/std-ops.cc
+@@ -1378,10 +1378,11 @@ fs::space(const path& p, error_code& ec) noexcept
+       ec.assign(errno, std::generic_category());
+   else
+     {
++      uintmax_t fragment_size = f.f_frsize;
+       info = space_info{
+-	f.f_blocks * f.f_frsize,
+-	f.f_bfree * f.f_frsize,
+-	f.f_bavail * f.f_frsize
++	f.f_blocks * fragment_size,
++	f.f_bfree * fragment_size,
++	f.f_bavail * fragment_size
+       };
+       ec.clear();
+     }
+diff --git a/libstdc++-v3/testsuite/27_io/filesystem/operations/space.cc b/libstdc++-v3/testsuite/27_io/filesystem/operations/space.cc
+index bdda24183bc1..3d64342fb8f3 100644
+--- a/libstdc++-v3/testsuite/27_io/filesystem/operations/space.cc
++++ b/libstdc++-v3/testsuite/27_io/filesystem/operations/space.cc
+@@ -32,6 +32,7 @@ test01()
+   std::error_code ec = make_error_code(std::errc::invalid_argument);
+   s = std::filesystem::space("/", ec);
+   VERIFY( !ec );
++
+   s = std::filesystem::space(__gnu_test::nonexistent_path(), ec);
+   VERIFY( ec );
+   VERIFY( s.capacity ==  static_cast<uintmax_t>(-1) );
+@@ -39,8 +40,16 @@ test01()
+   VERIFY( s.available ==  static_cast<uintmax_t>(-1) );
+ }
+ 
++void
++test02()
++{
++  std::filesystem::space_info s = std::filesystem::space(".");
++  VERIFY( s.capacity >= s.free );
++}
++
+ int
+ main()
+ {
+   test01();
++  test02();
+ }

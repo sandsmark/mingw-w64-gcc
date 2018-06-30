@@ -1,0 +1,944 @@
+From d4fd5c4964cf1862c19c0caa876fa43a677bc04a Mon Sep 17 00:00:00 2001
+From: redi <redi@138bc75d-0d04-0410-961f-82ee72b054a4>
+Date: Mon, 21 May 2018 17:18:35 +0000
+Subject: [PATCH] Add support for opening file streams from wide character
+ strings
+
+C++17 added new overloads to <fstream> class templates to support
+opening files from wide character strings "on systems where
+filesystem::path::value_type is not char". This patch adds those
+overloads conditional on _wfopen being available, and enables them for
+pre-C++17 modes as well.
+
+	Add support for opening file streams from wide character strings.
+	* config/io/basic_file_stdio.cc [_GLIBCXX_HAVE__WFOPEN]
+	(__basic_file<char>::open(const wchar_t*, ios_base::openmode)):
+	Define new overload.
+	* config/io/basic_file_stdio.h [_GLIBCXX_HAVE__WFOPEN]
+	(__basic_file<char>::open(const wchar_t*, ios_base::openmode)):
+	Declare new overload.
+	* configure.ac: Check for _wfopen.
+	* crossconfig.m4: Likewise.
+	* configure: Regenerate.
+	* config.h.in: Regenerate.
+	* include/bits/fstream.tcc [_GLIBCXX_HAVE__WFOPEN]
+	(basic_filebuf<C,T>::open(const wchar_t*, ios_base::openmode)):
+	Define new overload.
+	* include/std/fstream [_GLIBCXX_HAVE__WFOPEN]
+	(basic_filebuf<C,T>::open(const wchar_t*, ios_base::openmode)):
+	Declare new overload.
+	[_GLIBCXX_HAVE__WFOPEN]
+	(basic_ifstream<C,T>::basic_ifstream(const wchar_t*, openmode))
+	(basic_ifstream<C,T>::basic_open(const wchar_t*, openmode))
+	(basic_ofstream<C,T>::basic_ifstream(const wchar_t*, openmode))
+	(basic_ofstream<C,T>::basic_open(const wchar_t*, openmode))
+	(basic_fstream<C,T>::basic_ifstream(const wchar_t*, openmode))
+	(basic_fstream<C,T>::basic_open(const wchar_t*, openmode)): Define
+	new overloads.
+	* testsuite/27_io/basic_filebuf/open/wchar_t/1.cc: New.
+	* testsuite/27_io/basic_ifstream/cons/wchar_t/1.cc: New.
+	* testsuite/27_io/basic_ifstream/open/wchar_t/1.cc: New.
+	* testsuite/27_io/basic_ofstream/cons/wchar_t/1.cc: New.
+	* testsuite/27_io/basic_ofstream/open/wchar_t/1.cc: New.
+	* testsuite/27_io/basic_fstream/cons/wchar_t/1.cc: New.
+	* testsuite/27_io/basic_fstream/open/wchar_t/1.cc: New.
+
+git-svn-id: svn+ssh://gcc.gnu.org/svn/gcc/trunk@260479 138bc75d-0d04-0410-961f-82ee72b054a4
+---
+ libstdc++-v3/ChangeLog                             |  35 ++++++
+ libstdc++-v3/config.h.in                           |   3 +
+ libstdc++-v3/config/io/basic_file_stdio.cc         |  33 ++++++
+ libstdc++-v3/config/io/basic_file_stdio.h          |   5 +
+ libstdc++-v3/configure                             |  22 ++++
+ libstdc++-v3/configure.ac                          |   1 +
+ libstdc++-v3/crossconfig.m4                        |   1 +
+ libstdc++-v3/include/bits/fstream.tcc              |  36 +++++++
+ libstdc++-v3/include/std/fstream                   | 119 +++++++++++++++++++++
+ .../27_io/basic_filebuf/open/wchar_t/1.cc          |  72 +++++++++++++
+ .../27_io/basic_fstream/cons/wchar_t/1.cc          |  65 +++++++++++
+ .../27_io/basic_fstream/open/wchar_t/1.cc          |  45 ++++++++
+ .../27_io/basic_ifstream/cons/wchar_t/1.cc         |  66 ++++++++++++
+ .../27_io/basic_ifstream/open/wchar_t/1.cc         |  58 ++++++++++
+ .../27_io/basic_ofstream/cons/wchar_t/1.cc         |  66 ++++++++++++
+ .../27_io/basic_ofstream/open/wchar_t/1.cc         |  58 ++++++++++
+ 16 files changed, 685 insertions(+)
+ create mode 100644 libstdc++-v3/testsuite/27_io/basic_filebuf/open/wchar_t/1.cc
+ create mode 100644 libstdc++-v3/testsuite/27_io/basic_fstream/cons/wchar_t/1.cc
+ create mode 100644 libstdc++-v3/testsuite/27_io/basic_fstream/open/wchar_t/1.cc
+ create mode 100644 libstdc++-v3/testsuite/27_io/basic_ifstream/cons/wchar_t/1.cc
+ create mode 100644 libstdc++-v3/testsuite/27_io/basic_ifstream/open/wchar_t/1.cc
+ create mode 100644 libstdc++-v3/testsuite/27_io/basic_ofstream/cons/wchar_t/1.cc
+ create mode 100644 libstdc++-v3/testsuite/27_io/basic_ofstream/open/wchar_t/1.cc
+
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index eb77a791c814..9ca6ec6c1c0c 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,38 @@
++2018-05-21  Jonathan Wakely  <jwakely@redhat.com>
++
++	Add support for opening file streams from wide character strings.
++	* config/io/basic_file_stdio.cc [_GLIBCXX_HAVE__WFOPEN]
++	(__basic_file<char>::open(const wchar_t*, ios_base::openmode)):
++	Define new overload.
++	* config/io/basic_file_stdio.h [_GLIBCXX_HAVE__WFOPEN]
++	(__basic_file<char>::open(const wchar_t*, ios_base::openmode)):
++	Declare new overload.
++	* configure.ac: Check for _wfopen.
++	* crossconfig.m4: Likewise.
++	* configure: Regenerate.
++	* config.h.in: Regenerate.
++	* include/bits/fstream.tcc [_GLIBCXX_HAVE__WFOPEN]
++	(basic_filebuf<C,T>::open(const wchar_t*, ios_base::openmode)):
++	Define new overload.
++	* include/std/fstream [_GLIBCXX_HAVE__WFOPEN]
++	(basic_filebuf<C,T>::open(const wchar_t*, ios_base::openmode)):
++	Declare new overload.
++	[_GLIBCXX_HAVE__WFOPEN]
++	(basic_ifstream<C,T>::basic_ifstream(const wchar_t*, openmode))
++	(basic_ifstream<C,T>::basic_open(const wchar_t*, openmode))
++	(basic_ofstream<C,T>::basic_ifstream(const wchar_t*, openmode))
++	(basic_ofstream<C,T>::basic_open(const wchar_t*, openmode))
++	(basic_fstream<C,T>::basic_ifstream(const wchar_t*, openmode))
++	(basic_fstream<C,T>::basic_open(const wchar_t*, openmode)): Define
++	new overloads.
++	* testsuite/27_io/basic_filebuf/open/wchar_t/1.cc: New.
++	* testsuite/27_io/basic_ifstream/cons/wchar_t/1.cc: New.
++	* testsuite/27_io/basic_ifstream/open/wchar_t/1.cc: New.
++	* testsuite/27_io/basic_ofstream/cons/wchar_t/1.cc: New.
++	* testsuite/27_io/basic_ofstream/open/wchar_t/1.cc: New.
++	* testsuite/27_io/basic_fstream/cons/wchar_t/1.cc: New.
++	* testsuite/27_io/basic_fstream/open/wchar_t/1.cc: New.
++
+ 2018-05-21  François Dumont  <fdumont@gcc.gnu.org>
+ 
+ 	PR libstdc++/85845
+diff --git a/libstdc++-v3/config.h.in b/libstdc++-v3/config.h.in
+index 765cedc6edf9..751857800b84 100644
+--- a/libstdc++-v3/config.h.in
++++ b/libstdc++-v3/config.h.in
+@@ -706,6 +706,9 @@
+ /* Define to 1 if you have the `_tanl' function. */
+ #undef HAVE__TANL
+ 
++/* Define to 1 if you have the `_wfopen' function. */
++#undef HAVE__WFOPEN
++
+ /* Define to 1 if you have the `__cxa_thread_atexit' function. */
+ #undef HAVE___CXA_THREAD_ATEXIT
+ 
+diff --git a/libstdc++-v3/config/io/basic_file_stdio.cc b/libstdc++-v3/config/io/basic_file_stdio.cc
+index a46814802cda..09ccd6a47882 100644
+--- a/libstdc++-v3/config/io/basic_file_stdio.cc
++++ b/libstdc++-v3/config/io/basic_file_stdio.cc
+@@ -249,6 +249,39 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+     return __ret;
+   }
+ 
++#if _GLIBCXX_HAVE__WFOPEN && _GLIBCXX_USE_WCHAR_T
++  __basic_file<char>*
++  __basic_file<char>::open(const wchar_t* __name, ios_base::openmode __mode)
++  {
++    __basic_file* __ret = NULL;
++    const char* __c_mode = fopen_mode(__mode);
++    if (__c_mode && !this->is_open())
++      {
++	wchar_t __wc_mode[4] = { };
++	int __i = 0;
++	do
++	  {
++	    switch(__c_mode[__i]) {
++	    case 'a': __wc_mode[__i] = L'a'; break;
++	    case 'b': __wc_mode[__i] = L'b'; break;
++	    case 'r': __wc_mode[__i] = L'r'; break;
++	    case 'w': __wc_mode[__i] = L'w'; break;
++	    case '+': __wc_mode[__i] = L'+'; break;
++	    default: return __ret;
++	    }
++	  }
++	while (__c_mode[++__i]);
++
++	if ((_M_cfile = _wfopen(__name, __wc_mode)))
++	  {
++	    _M_cfile_created = true;
++	    __ret = this;
++	  }
++      }
++    return __ret;
++  }
++#endif
++
+   bool
+   __basic_file<char>::is_open() const throw ()
+   { return _M_cfile != 0; }
+diff --git a/libstdc++-v3/config/io/basic_file_stdio.h b/libstdc++-v3/config/io/basic_file_stdio.h
+index 58f24f670f68..3c857272c57d 100644
+--- a/libstdc++-v3/config/io/basic_file_stdio.h
++++ b/libstdc++-v3/config/io/basic_file_stdio.h
+@@ -84,6 +84,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+       __basic_file*
+       open(const char* __name, ios_base::openmode __mode, int __prot = 0664);
+ 
++#if _GLIBCXX_HAVE__WFOPEN && _GLIBCXX_USE_WCHAR_T
++      __basic_file*
++      open(const wchar_t* __name, ios_base::openmode __mode);
++#endif
++
+       __basic_file*
+       sys_open(__c_file* __file, ios_base::openmode);
+ 
+diff --git a/libstdc++-v3/configure b/libstdc++-v3/configure
+index c9dbaa139d5a..f3522ee66660 100755
+--- a/libstdc++-v3/configure
++++ b/libstdc++-v3/configure
+@@ -28127,6 +28127,17 @@ eval as_val=\$$as_ac_var
+ #define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
+ _ACEOF
+ 
++fi
++done
++
++  for ac_func in _wfopen
++do :
++  ac_fn_c_check_func "$LINENO" "_wfopen" "ac_cv_func__wfopen"
++if test "x$ac_cv_func__wfopen" = x""yes; then :
++  cat >>confdefs.h <<_ACEOF
++#define HAVE__WFOPEN 1
++_ACEOF
++
+ fi
+ done
+ 
+@@ -66122,6 +66133,17 @@ eval as_val=\$$as_ac_var
+ #define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
+ _ACEOF
+ 
++fi
++done
++
++    for ac_func in _wfopen
++do :
++  ac_fn_c_check_func "$LINENO" "_wfopen" "ac_cv_func__wfopen"
++if test "x$ac_cv_func__wfopen" = x""yes; then :
++  cat >>confdefs.h <<_ACEOF
++#define HAVE__WFOPEN 1
++_ACEOF
++
+ fi
+ done
+ 
+diff --git a/libstdc++-v3/configure.ac b/libstdc++-v3/configure.ac
+index 0ef96270c9c5..7e1fd84606a6 100644
+--- a/libstdc++-v3/configure.ac
++++ b/libstdc++-v3/configure.ac
+@@ -263,6 +263,7 @@ if $GLIBCXX_IS_NATIVE; then
+ 
+   AC_CHECK_FUNCS(__cxa_thread_atexit_impl __cxa_thread_atexit)
+   AC_CHECK_FUNCS(aligned_alloc posix_memalign memalign _aligned_malloc)
++  AC_CHECK_FUNCS(_wfopen)
+ 
+   # For iconv support.
+   AM_ICONV
+diff --git a/libstdc++-v3/crossconfig.m4 b/libstdc++-v3/crossconfig.m4
+index fa56795b25ef..f0a55c684045 100644
+--- a/libstdc++-v3/crossconfig.m4
++++ b/libstdc++-v3/crossconfig.m4
+@@ -199,6 +199,7 @@ case "${host}" in
+     GLIBCXX_CHECK_MATH_SUPPORT
+     GLIBCXX_CHECK_STDLIB_SUPPORT
+     AC_CHECK_FUNCS(aligned_alloc posix_memalign memalign _aligned_malloc)
++    AC_CHECK_FUNCS(_wfopen)
+     ;;
+   *-netbsd*)
+     SECTION_FLAGS='-ffunction-sections -fdata-sections'
+diff --git a/libstdc++-v3/include/bits/fstream.tcc b/libstdc++-v3/include/bits/fstream.tcc
+index 08cf189ee06c..6205db75340b 100644
+--- a/libstdc++-v3/include/bits/fstream.tcc
++++ b/libstdc++-v3/include/bits/fstream.tcc
+@@ -207,6 +207,42 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+       return __ret;
+     }
+ 
++#if _GLIBCXX_HAVE__WFOPEN && _GLIBCXX_USE_WCHAR_T
++  template<typename _CharT, typename _Traits>
++    basic_filebuf<_CharT, _Traits>*
++    basic_filebuf<_CharT, _Traits>::
++    open(const wchar_t* __s, ios_base::openmode __mode)
++    {
++      __filebuf_type *__ret = 0;
++      if (!this->is_open())
++	{
++	  _M_file.open(__s, __mode);
++	  if (this->is_open())
++	    {
++	      _M_allocate_internal_buffer();
++	      _M_mode = __mode;
++
++	      // Setup initial buffer to 'uncommitted' mode.
++	      _M_reading = false;
++	      _M_writing = false;
++	      _M_set_buffer(-1);
++
++	      // Reset to initial state.
++	      _M_state_last = _M_state_cur = _M_state_beg;
++
++	      // 27.8.1.3,4
++	      if ((__mode & ios_base::ate)
++		  && this->seekoff(0, ios_base::end, __mode)
++		  == pos_type(off_type(-1)))
++		this->close();
++	      else
++		__ret = this;
++	    }
++	}
++      return __ret;
++    }
++#endif // HAVE__WFOPEN && USE_WCHAR_T
++
+   template<typename _CharT, typename _Traits>
+     typename basic_filebuf<_CharT, _Traits>::__filebuf_type*
+     basic_filebuf<_CharT, _Traits>::
+diff --git a/libstdc++-v3/include/std/fstream b/libstdc++-v3/include/std/fstream
+index 05661d9d58f1..795209dd8dd6 100644
+--- a/libstdc++-v3/include/std/fstream
++++ b/libstdc++-v3/include/std/fstream
+@@ -309,6 +309,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+       __filebuf_type*
+       open(const char* __s, ios_base::openmode __mode);
+ 
++#if _GLIBCXX_HAVE__WFOPEN && _GLIBCXX_USE_WCHAR_T
++      /**
++       *  @brief  Opens an external file.
++       *  @param  __s  The name of the file, as a wide character string.
++       *  @param  __mode  The open mode flags.
++       *  @return  @c this on success, NULL on failure
++       */
++      __filebuf_type*
++      open(const wchar_t* __s, ios_base::openmode __mode);
++#endif
++
+ #if __cplusplus >= 201103L
+       /**
+        *  @brief  Opens an external file.
+@@ -522,6 +533,23 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	this->open(__s, __mode);
+       }
+ 
++#if _GLIBCXX_HAVE__WFOPEN && _GLIBCXX_USE_WCHAR_T
++      /**
++       *  @param  Create an input file stream.
++       *  @param  __s  Wide string specifying the filename.
++       *  @param  __mode  Open file in specified mode (see std::ios_base).
++       *
++       *  @c ios_base::in is automatically included in @a __mode.
++       */
++      basic_ifstream(const wchar_t* __s,
++		     ios_base::openmode __mode = ios_base::in)
++      : __istream_type(), _M_filebuf()
++      {
++	this->init(&_M_filebuf);
++	this->open(__s, __mode);
++      }
++#endif
++
+ #if __cplusplus >= 201103L
+       /**
+        *  @brief  Create an input file stream.
+@@ -637,6 +665,25 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	  this->clear();
+       }
+ 
++#if _GLIBCXX_HAVE__WFOPEN && _GLIBCXX_USE_WCHAR_T
++      /**
++       *  @brief  Opens an external file.
++       *  @param  __s  The name of the file, as a wide character string.
++       *  @param  __mode  The open mode flags.
++       *
++       *  Calls @c std::basic_filebuf::open(__s,__mode|in).  If that function
++       *  fails, @c failbit is set in the stream's error state.
++       */
++      void
++      open(const wchar_t* __s, ios_base::openmode __mode = ios_base::in)
++      {
++	if (!_M_filebuf.open(__s, __mode | ios_base::in))
++	  this->setstate(ios_base::failbit);
++	else
++	  this->clear();
++      }
++#endif
++
+ #if __cplusplus >= 201103L
+       /**
+        *  @brief  Opens an external file.
+@@ -748,6 +795,24 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	this->open(__s, __mode);
+       }
+ 
++#if _GLIBCXX_HAVE__WFOPEN && _GLIBCXX_USE_WCHAR_T
++      /**
++       *  @param  Create an output file stream.
++       *  @param  __s  Wide string specifying the filename.
++       *  @param  __mode  Open file in specified mode (see std::ios_base).
++       *
++       *  @c ios_base::out | @c ios_base::trunc is automatically included in
++       *  @a __mode.
++       */
++      basic_ofstream(const wchar_t* __s,
++		     ios_base::openmode __mode = ios_base::out|ios_base::trunc)
++      : __ostream_type(), _M_filebuf()
++      {
++	this->init(&_M_filebuf);
++	this->open(__s, __mode);
++      }
++#endif
++
+ #if __cplusplus >= 201103L
+       /**
+        *  @brief  Create an output file stream.
+@@ -863,6 +928,25 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	  this->clear();
+       }
+ 
++#if _GLIBCXX_HAVE__WFOPEN && _GLIBCXX_USE_WCHAR_T
++      /**
++       *  @brief  Opens an external file.
++       *  @param  __s  The name of the file.
++       *  @param  __mode  The open mode flags.
++       *
++       *  Calls @c std::basic_filebuf::open(__s,__mode|out).  If that
++       *  function fails, @c failbit is set in the stream's error state.
++       */
++      void
++      open(const wchar_t* __s, ios_base::openmode __mode = ios_base::out)
++      {
++	if (!_M_filebuf.open(__s, __mode | ios_base::out))
++	  this->setstate(ios_base::failbit);
++	else
++	  this->clear();
++      }
++#endif
++
+ #if __cplusplus >= 201103L
+       /**
+        *  @brief  Opens an external file.
+@@ -974,6 +1058,21 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	this->open(__s, __mode);
+       }
+ 
++#if _GLIBCXX_HAVE__WFOPEN && _GLIBCXX_USE_WCHAR_T
++      /**
++       *  @param  Create an input/output file stream.
++       *  @param  __s  Wide string specifying the filename.
++       *  @param  __mode  Open file in specified mode (see std::ios_base).
++       */
++      basic_fstream(const wchar_t* __s,
++		    ios_base::openmode __mode = ios_base::in | ios_base::out)
++      : __iostream_type(0), _M_filebuf()
++      {
++	this->init(&_M_filebuf);
++	this->open(__s, __mode);
++      }
++#endif
++
+ #if __cplusplus >= 201103L
+       /**
+        *  @brief  Create an input/output file stream.
+@@ -1086,6 +1185,26 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	  this->clear();
+       }
+ 
++#if _GLIBCXX_HAVE__WFOPEN && _GLIBCXX_USE_WCHAR_T
++      /**
++       *  @brief  Opens an external file.
++       *  @param  __s  The name of the file.
++       *  @param  __mode  The open mode flags.
++       *
++       *  Calls @c std::basic_filebuf::open(__s,__mode).  If that
++       *  function fails, @c failbit is set in the stream's error state.
++       */
++      void
++      open(const wchar_t* __s,
++	   ios_base::openmode __mode = ios_base::in | ios_base::out)
++      {
++	if (!_M_filebuf.open(__s, __mode))
++	  this->setstate(ios_base::failbit);
++	else
++	  this->clear();
++      }
++#endif
++
+ #if __cplusplus >= 201103L
+       /**
+        *  @brief  Opens an external file.
+diff --git a/libstdc++-v3/testsuite/27_io/basic_filebuf/open/wchar_t/1.cc b/libstdc++-v3/testsuite/27_io/basic_filebuf/open/wchar_t/1.cc
+new file mode 100644
+index 000000000000..a6f33548172b
+--- /dev/null
++++ b/libstdc++-v3/testsuite/27_io/basic_filebuf/open/wchar_t/1.cc
+@@ -0,0 +1,72 @@
++// Copyright (C) 2018 Free Software Foundation, Inc.
++//
++// This file is part of the GNU ISO C++ Library.  This library is free
++// software; you can redistribute it and/or modify it under the
++// terms of the GNU General Public License as published by the
++// Free Software Foundation; either version 3, or (at your option)
++// any later version.
++
++// This library is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++
++// You should have received a copy of the GNU General Public License along
++// with this library; see the file COPYING3.  If not see
++// <http://www.gnu.org/licenses/>.
++
++// { dg-do run { target *-*-mingw* } }
++// { dg-require-fileio "" }
++
++#include <fstream>
++#include <testsuite_hooks.h>
++
++const wchar_t name_01[] = L"filebuf_members-1.tst";
++const wchar_t name_02[] = L"filebuf_members-1.txt";
++
++// Test member functions.
++void test01()
++{
++  const wchar_t* name_03 = L"filebuf_members-w3"; // empty file, need to create
++
++  std::filebuf fb_01; // in
++  std::filebuf fb_02; // out
++  std::filebuf fb_03; // in | out
++
++  // bool is_open()
++  VERIFY( !fb_01.is_open() );
++  VERIFY( !fb_02.is_open() );
++  VERIFY( !fb_03.is_open() );
++
++  // filebuf_type* open(const wchar_t* __s, ios_base::openmode __mode)
++  fb_01.open(name_01, std::ios_base::in | std::ios_base::ate);
++  VERIFY( fb_01.is_open() );
++
++  // Try to open two different files without closing the first:
++  // Should keep the old file attached, and disregard attempt to overthrow.
++  std::filebuf* f = fb_02.open(name_02, std::ios_base::in | std::ios_base::out
++			       | std::ios_base::trunc);
++  VERIFY( f );
++  VERIFY( fb_02.is_open() );
++
++  f = fb_02.open(name_03, std::ios_base::in | std::ios_base::out);
++  VERIFY( !f );
++  VERIFY( fb_02.is_open() );
++
++  fb_03.open(name_03, std::ios_base::out | std::ios_base::trunc);
++  VERIFY( fb_03.is_open() );
++}
++
++void test02()
++{
++  std::wfilebuf fb;
++  fb.open(name_01, std::wios::in);
++  VERIFY( fb.is_open() );
++}
++
++int
++main()
++{
++  test01();
++  test02();
++}
+diff --git a/libstdc++-v3/testsuite/27_io/basic_fstream/cons/wchar_t/1.cc b/libstdc++-v3/testsuite/27_io/basic_fstream/cons/wchar_t/1.cc
+new file mode 100644
+index 000000000000..0d14f825c63d
+--- /dev/null
++++ b/libstdc++-v3/testsuite/27_io/basic_fstream/cons/wchar_t/1.cc
+@@ -0,0 +1,65 @@
++// Copyright (C) 2018 Free Software Foundation, Inc.
++//
++// This file is part of the GNU ISO C++ Library.  This library is free
++// software; you can redistribute it and/or modify it under the
++// terms of the GNU General Public License as published by the
++// Free Software Foundation; either version 3, or (at your option)
++// any later version.
++
++// This library is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++
++// You should have received a copy of the GNU General Public License along
++// with this library; see the file COPYING3.  If not see
++// <http://www.gnu.org/licenses/>.
++
++// { dg-do run { target *-*-mingw* } }
++
++#include <fstream>
++#include <testsuite_hooks.h>
++
++void test01()
++{
++  const wchar_t* name = L"fstream_name.txt";
++  std::fstream fs(name, std::wios::out);
++  VERIFY( fs.is_open() );
++}
++
++void test02()
++{
++  const wchar_t name[] = L"fstream_name.txt";
++  std::wfstream wfs(name, std::wios::in|std::wios::out);
++  VERIFY( wfs.is_open() );
++}
++
++#if __cplusplus >= 201103L
++using std::is_constructible;
++using std::fstream;
++using std::wfstream;
++using std::ios;
++static_assert(is_constructible<fstream, const wchar_t*>::value);
++static_assert(is_constructible<fstream, wchar_t*>::value);
++static_assert(is_constructible<fstream, const wchar_t(&)[1]>::value);
++static_assert(is_constructible<fstream, wchar_t(&)[1]>::value);
++static_assert(is_constructible<fstream, const wchar_t*, ios::openmode>::value);
++static_assert(is_constructible<fstream, wchar_t*, ios::openmode>::value);
++static_assert(is_constructible<fstream, const wchar_t(&)[1], ios::openmode>::value);
++static_assert(is_constructible<fstream, wchar_t(&)[1], ios::openmode>::value);
++static_assert(is_constructible<wfstream, const wchar_t*>::value);
++static_assert(is_constructible<wfstream, wchar_t*>::value);
++static_assert(is_constructible<wfstream, const wchar_t(&)[1]>::value);
++static_assert(is_constructible<wfstream, wchar_t(&)[1]>::value);
++static_assert(is_constructible<wfstream, const wchar_t*, ios::openmode>::value);
++static_assert(is_constructible<wfstream, wchar_t*, ios::openmode>::value);
++static_assert(is_constructible<wfstream, const wchar_t(&)[1], ios::openmode>::value);
++static_assert(is_constructible<wfstream, wchar_t(&)[1], ios::openmode>::value);
++#endif
++
++int
++main()
++{
++  test01();
++  test02();
++}
+diff --git a/libstdc++-v3/testsuite/27_io/basic_fstream/open/wchar_t/1.cc b/libstdc++-v3/testsuite/27_io/basic_fstream/open/wchar_t/1.cc
+new file mode 100644
+index 000000000000..cd47292d7936
+--- /dev/null
++++ b/libstdc++-v3/testsuite/27_io/basic_fstream/open/wchar_t/1.cc
+@@ -0,0 +1,45 @@
++// Copyright (C) 2018 Free Software Foundation, Inc.
++//
++// This file is part of the GNU ISO C++ Library.  This library is free
++// software; you can redistribute it and/or modify it under the
++// terms of the GNU General Public License as published by the
++// Free Software Foundation; either version 3, or (at your option)
++// any later version.
++
++// This library is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++
++// You should have received a copy of the GNU General Public License along
++// with this library; see the file COPYING3.  If not see
++// <http://www.gnu.org/licenses/>.
++
++// { dg-do run { target *-*-mingw* } }
++
++#include <fstream>
++#include <testsuite_hooks.h>
++
++void test01()
++{
++  std::fstream fs;
++
++  const wchar_t* name = L"fstream_name.txt";
++  fs.open(name, std::wios::out);
++  VERIFY( fs.is_open() );
++}
++
++void test02()
++{
++  const wchar_t name[] = L"fstream_name.txt";
++  std::wfstream wfs;
++  wfs.open(name, std::wios::in|std::wios::out);
++  VERIFY( wfs.is_open() );
++}
++
++int
++main()
++{
++  test01();
++  test02();
++}
+diff --git a/libstdc++-v3/testsuite/27_io/basic_ifstream/cons/wchar_t/1.cc b/libstdc++-v3/testsuite/27_io/basic_ifstream/cons/wchar_t/1.cc
+new file mode 100644
+index 000000000000..7437cff60a52
+--- /dev/null
++++ b/libstdc++-v3/testsuite/27_io/basic_ifstream/cons/wchar_t/1.cc
+@@ -0,0 +1,66 @@
++// Copyright (C) 2018 Free Software Foundation, Inc.
++//
++// This file is part of the GNU ISO C++ Library.  This library is free
++// software; you can redistribute it and/or modify it under the
++// terms of the GNU General Public License as published by the
++// Free Software Foundation; either version 3, or (at your option)
++// any later version.
++
++// This library is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++
++// You should have received a copy of the GNU General Public License along
++// with this library; see the file COPYING3.  If not see
++// <http://www.gnu.org/licenses/>.
++
++// { dg-do run { target *-*-mingw* } }
++
++#include <fstream>
++#include <testsuite_hooks.h>
++
++void test01()
++{
++  const wchar_t* name = L"ifstream_members-1.txt";
++  std::ifstream ifs(name);
++  VERIFY( ifs.is_open() );
++}
++
++void test02()
++{
++  const wchar_t name[] = L"ifstream_members-1.txt";
++  std::wifstream wifs(name, std::wios::in);
++  VERIFY( wifs.is_open() );
++}
++
++#if __cplusplus >= 201103L
++using std::is_constructible;
++using std::ifstream;
++using std::wifstream;
++using std::ios;
++using std::wios;
++static_assert(is_constructible<ifstream, const wchar_t*>::value);
++static_assert(is_constructible<ifstream, wchar_t*>::value);
++static_assert(is_constructible<ifstream, const wchar_t(&)[1]>::value);
++static_assert(is_constructible<ifstream, wchar_t(&)[1]>::value);
++static_assert(is_constructible<ifstream, const wchar_t*, ios::openmode>::value);
++static_assert(is_constructible<ifstream, wchar_t*, ios::openmode>::value);
++static_assert(is_constructible<ifstream, const wchar_t(&)[1], ios::openmode>::value);
++static_assert(is_constructible<ifstream, wchar_t(&)[1], ios::openmode>::value);
++static_assert(is_constructible<wifstream, const wchar_t*>::value);
++static_assert(is_constructible<wifstream, wchar_t*>::value);
++static_assert(is_constructible<wifstream, const wchar_t(&)[1]>::value);
++static_assert(is_constructible<wifstream, wchar_t(&)[1]>::value);
++static_assert(is_constructible<wifstream, const wchar_t*, wios::openmode>::value);
++static_assert(is_constructible<wifstream, wchar_t*, wios::openmode>::value);
++static_assert(is_constructible<wifstream, const wchar_t(&)[1], wios::openmode>::value);
++static_assert(is_constructible<wifstream, wchar_t(&)[1], wios::openmode>::value);
++#endif
++
++int
++main()
++{
++  test01();
++  test02();
++}
+diff --git a/libstdc++-v3/testsuite/27_io/basic_ifstream/open/wchar_t/1.cc b/libstdc++-v3/testsuite/27_io/basic_ifstream/open/wchar_t/1.cc
+new file mode 100644
+index 000000000000..e23669739248
+--- /dev/null
++++ b/libstdc++-v3/testsuite/27_io/basic_ifstream/open/wchar_t/1.cc
+@@ -0,0 +1,58 @@
++// Copyright (C) 2018 Free Software Foundation, Inc.
++//
++// This file is part of the GNU ISO C++ Library.  This library is free
++// software; you can redistribute it and/or modify it under the
++// terms of the GNU General Public License as published by the
++// Free Software Foundation; either version 3, or (at your option)
++// any later version.
++
++// This library is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++
++// You should have received a copy of the GNU General Public License along
++// with this library; see the file COPYING3.  If not see
++// <http://www.gnu.org/licenses/>.
++
++// 30.9.3.1 basic_ifstream constructors [ifstream.cons]
++
++// { dg-do run { target *-*-mingw* } }
++
++#include <fstream>
++#include <testsuite_hooks.h>
++
++const wchar_t name_01[] = L"ifstream_members-1.tst";
++
++void test01()
++{
++  std::ifstream ifs1;
++  ifs1.close();
++
++  VERIFY( !ifs1.is_open() );
++  VERIFY( !(ifs1) );
++
++  ifs1.open(name_01);
++  VERIFY( ifs1.is_open() );
++
++  VERIFY( (ifs1) );
++  VERIFY( ifs1.rdstate() == std::ios_base::goodbit );
++
++  ifs1.close();
++}
++
++void test02()
++{
++  std::wifstream wifs1;
++  wifs1.open(name_01, std::wios::in);
++  VERIFY( wifs1.is_open() );
++
++  VERIFY( (wifs1) );
++  VERIFY( wifs1.rdstate() == std::ios_base::goodbit );
++}
++
++int main()
++{
++  test01();
++  test02();
++}
+diff --git a/libstdc++-v3/testsuite/27_io/basic_ofstream/cons/wchar_t/1.cc b/libstdc++-v3/testsuite/27_io/basic_ofstream/cons/wchar_t/1.cc
+new file mode 100644
+index 000000000000..ae9893e2413c
+--- /dev/null
++++ b/libstdc++-v3/testsuite/27_io/basic_ofstream/cons/wchar_t/1.cc
+@@ -0,0 +1,66 @@
++// Copyright (C) 2018 Free Software Foundation, Inc.
++//
++// This file is part of the GNU ISO C++ Library.  This library is free
++// software; you can redistribute it and/or modify it under the
++// terms of the GNU General Public License as published by the
++// Free Software Foundation; either version 3, or (at your option)
++// any later version.
++
++// This library is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++
++// You should have received a copy of the GNU General Public License along
++// with this library; see the file COPYING3.  If not see
++// <http://www.gnu.org/licenses/>.
++
++// { dg-do run { target *-*-mingw* } }
++
++#include <fstream>
++#include <testsuite_hooks.h>
++
++void test01()
++{
++  const wchar_t* name = L"ofstream_name.txt";
++  std::ofstream ofs(name);
++  VERIFY( ofs.is_open() );
++}
++
++void test02()
++{
++  const wchar_t name[] = L"ofstream_name.txt";
++  std::wofstream wofs(name, std::wios::out);
++  VERIFY( wofs.is_open() );
++}
++
++#if __cplusplus >= 201103L
++using std::is_constructible;
++using std::ofstream;
++using std::wofstream;
++using std::ios;
++using std::wios;
++static_assert(is_constructible<ofstream, const wchar_t*>::value);
++static_assert(is_constructible<ofstream, wchar_t*>::value);
++static_assert(is_constructible<ofstream, const wchar_t(&)[1]>::value);
++static_assert(is_constructible<ofstream, wchar_t(&)[1]>::value);
++static_assert(is_constructible<ofstream, const wchar_t*, ios::openmode>::value);
++static_assert(is_constructible<ofstream, wchar_t*, ios::openmode>::value);
++static_assert(is_constructible<ofstream, const wchar_t(&)[1], ios::openmode>::value);
++static_assert(is_constructible<ofstream, wchar_t(&)[1], ios::openmode>::value);
++static_assert(is_constructible<wofstream, const wchar_t*>::value);
++static_assert(is_constructible<wofstream, wchar_t*>::value);
++static_assert(is_constructible<wofstream, const wchar_t(&)[1]>::value);
++static_assert(is_constructible<wofstream, wchar_t(&)[1]>::value);
++static_assert(is_constructible<wofstream, const wchar_t*, wios::openmode>::value);
++static_assert(is_constructible<wofstream, wchar_t*, wios::openmode>::value);
++static_assert(is_constructible<wofstream, const wchar_t(&)[1], wios::openmode>::value);
++static_assert(is_constructible<wofstream, wchar_t(&)[1], wios::openmode>::value);
++#endif
++
++int
++main()
++{
++  test01();
++  test02();
++}
+diff --git a/libstdc++-v3/testsuite/27_io/basic_ofstream/open/wchar_t/1.cc b/libstdc++-v3/testsuite/27_io/basic_ofstream/open/wchar_t/1.cc
+new file mode 100644
+index 000000000000..e024a27b89c1
+--- /dev/null
++++ b/libstdc++-v3/testsuite/27_io/basic_ofstream/open/wchar_t/1.cc
+@@ -0,0 +1,58 @@
++// Copyright (C) 2018 Free Software Foundation, Inc.
++//
++// This file is part of the GNU ISO C++ Library.  This library is free
++// software; you can redistribute it and/or modify it under the
++// terms of the GNU General Public License as published by the
++// Free Software Foundation; either version 3, or (at your option)
++// any later version.
++
++// This library is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++
++// You should have received a copy of the GNU General Public License along
++// with this library; see the file COPYING3.  If not see
++// <http://www.gnu.org/licenses/>.
++
++// 30.9.4.1 basic_ofstream constructors [ofstream.cons]
++
++// { dg-do run { target *-*-mingw* } }
++
++#include <fstream>
++#include <testsuite_hooks.h>
++
++const wchar_t name_02[] = L"ofstream_members-1.txt";
++
++void test01()
++{
++  std::ofstream ofs1;
++  ofs1.close();
++
++  VERIFY( !ofs1.is_open() );
++  VERIFY( !(ofs1) );
++
++  ofs1.open(name_02);
++  VERIFY( ofs1.is_open() );
++
++  VERIFY( (ofs1) );
++  VERIFY( ofs1.rdstate() == std::ios_base::goodbit );
++
++  ofs1.close();
++}
++
++void test02()
++{
++  std::wofstream wofs1;
++  wofs1.open(name_02, std::wios::out);
++  VERIFY( wofs1.is_open() );
++
++  VERIFY( (wofs1) );
++  VERIFY( wofs1.rdstate() == std::ios_base::goodbit );
++}
++
++int main()
++{
++  test01();
++  test02();
++}

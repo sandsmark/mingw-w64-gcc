@@ -25,14 +25,20 @@ options=('!strip' 'staticlibs' '!emptydirs' '!buildflags')
 #source=(https://sources.archlinux.org/other/gcc/gcc-${pkgver/+/-}.tar.xz{,.sig}
 source=(https://ftp.gnu.org/gnu/gcc/gcc-$pkgver/gcc-$pkgver.tar.xz{,.sig}
        "http://isl.gforge.inria.fr/isl-${_islver}.tar.bz2"
-        bz85638.patch)
+        bz85638.patch
+        space.patch
+        0019-gcc-8-branch-Backport-patches-for-std-filesystem-from-master.patch
+        )
 validpgpkeys=(F3691687D867B81B51CE07D9BBE43771487328A9  # bpiotrowski@archlinux.org
               13975A70E63C361C73AE69EF6EEB81F8981C74C7  # richard.guenther@gmail.com
               33C235A34C46AA3FFB293709A328C3A2C3C45C06) # Jakub Jelinek <jakub@redhat.com>
 sha256sums=('1d1866f992626e61349a1ccd0b8d5253816222cdc13390dcfaa74b093aa2b153'
             'SKIP'
             '6b8b0fd7f81d0a957beb3679c81bbb34ccc7568d5682844d8924424a0dadcb1b'
-            'd2a13f550ca7f9131ef14239e8f994b37c81fc8c59f73aff5edab170f5ed6124')
+            'd2a13f550ca7f9131ef14239e8f994b37c81fc8c59f73aff5edab170f5ed6124'
+            'SKIP'
+            'SKIP'
+            )
 
 prepare() {
   ln -sf gcc-${pkgver/+/-} gcc
@@ -42,6 +48,10 @@ prepare() {
 
   # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85638
   patch -p0 -i "$srcdir"/bz85638.patch
+
+  # https://sourceforge.net/p/mingw-w64/bugs/737/
+  patch -p1 -i "$srcdir"/space.patch
+  patch -p1 -i "$srcdir"/0019-gcc-8-branch-Backport-patches-for-std-filesystem-from-master.patch
 }
 
 build() {
